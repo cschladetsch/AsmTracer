@@ -2,6 +2,10 @@
 
 This project implements a simple ray-tracer in x86-64 assembly language using NASM (Netwide Assembler). The ray-tracer generates a BMP image file displaying two spheres.
 
+## Sample
+
+![Image](resources/output.bmp)
+
 ## Prerequisites
 
 To compile and run this project, you'll need:
@@ -21,14 +25,13 @@ sudo apt install nasm build-essential
 
 To compile the ray-tracer, follow these steps:
 
-1. Clone this repository or download the `main.asm` file.
+1. Clone this repository.
 2. Open a terminal and navigate to the project directory.
 3. Run the following commands:
-
-```bash
-nasm -f elf64 main.asm
-ld main.o -o raytracer
-```
+    ```bash
+    nasm -f elf64 main.asm
+    ld main.o -o raytracer
+    ```
 
 This will create an executable named `raytracer`.
 
