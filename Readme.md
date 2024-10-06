@@ -62,6 +62,9 @@ Replace `YourWindowsUsername` with your actual Windows username.
 ## Project Structure
 
 - `main.asm`: The main assembly source code for the ray-tracer.
+- `vector.asm`: A basic 3d vector using MMX and SSE.
+- `sphere.asm`: Ray/sphere calculations.
+- `constancts.inc`: Global constants.
 - `README.md`: This file, containing project information and instructions.
 - `.gitignore`: Specifies intentionally untracked files to ignore.
 
