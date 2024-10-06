@@ -1,124 +1,75 @@
-; Debug version: Ray-tracer in x64 Assembly (NASM) for Linux
-; Outputs a BMP image with two spheres to stdout
+; main.asm - Ray-tracer Main Logic
+
+%include "constants.inc"
+
+extern normalize_vector
+extern dot_product
+extern reflect_vector
+extern add_vector
+extern subtract_vector
+extern multiply_vector
+extern intersect_sphere
+extern shade_sphere
+extern trace_ray
+extern write_bmp_header
+extern write_pixel
+
+section .rodata
+neg_mask: dq 0x8000000000000000
 
 section .data
-    ; BMP Header (unchanged)
-    bmp_header:
-        db 0x42, 0x4D           ; BM
-        dd 54 + 800*600*3       ; File size
-        dd 0                    ; Reserved
-        dd 54                   ; Offset to pixel data
-        dd 40                   ; DIB header size
-        dd 800                  ; Width
-        dd 600                  ; Height
-        dw 1                    ; Planes
-        dw 24                   ; Bits per pixel
-        dd 0                    ; Compression
-        dd 800*600*3            ; Image size
-        dd 2835                 ; X pixels per meter
-        dd 2835                 ; Y pixels per meter
-        dd 0                    ; Colors in color table
-        dd 0                    ; Important color count
-    bmp_header_len equ $ - bmp_header
+; MAX_DEPTH: dq 5
 
-    width dq 800.0
-    height dq 600.0
+; Sphere data
+sphere1 istruc sphere
+    at sphere.center, dq -2.0, 0.0, -5.0
+    at sphere.radius, dq 1.0
+    at sphere.color,  dq 1.0, 0.0, 0.0
+iend
 
-    sphere1_center dq -1.0, 0.0, -3.0
-    sphere1_radius dq 0.5
-    sphere1_color db 0, 0, 255  ; Blue (BGR in BMP)
+sphere2 istruc sphere
+    at sphere.center, dq 0.0, 1.0, -7.0
+    at sphere.radius, dq 1.5
+    at sphere.color,  dq 0.0, 1.0, 0.0
+iend
 
-    sphere2_center dq 1.0, 0.0, -3.0
-    sphere2_radius dq 0.5
-    sphere2_color db 255, 0, 0  ; Red (BGR in BMP)
-
-    background_color db 100, 100, 100  ; Light gray
-
-section .bss
-    pixel resb 3
+sphere3 istruc sphere
+    at sphere.center, dq 2.0, -1.0, -5.0
+    at sphere.radius, dq 0.75
+    at sphere.color,  dq 0.0, 0.0, 1.0
+iend
 
 section .text
-    global _start
+global _start
 
 _start:
-    ; Write BMP header
-    mov rax, 1          ; sys_write
-    mov rdi, 1          ; stdout
-    mov rsi, bmp_header
-    mov rdx, bmp_header_len
-    syscall
+    call write_bmp_header
 
     ; Initialize loop counters
-    mov r12, 599        ; Start from bottom row (BMP is bottom-up)
+    mov r12, HEIGHT - 1  ; Start from bottom row (BMP is bottom-up)
 
 .row_loop:
-    mov r13, 0          ; Column counter
+    xor r13, r13         ; Column counter
 
 .col_loop:
     ; Calculate ray direction
-    cvtsi2sd xmm0, r13
-    cvtsi2sd xmm1, r12
-    divsd xmm0, qword [width]
-    divsd xmm1, qword [height]
-    subsd xmm0, qword [half]
-    subsd xmm1, qword [half]
-    mulsd xmm0, qword [aspect_ratio]
-    movsd xmm2, qword [neg_one]
+    call calculate_ray_direction
 
-    ; Normalize ray direction
-    call normalize_vector
+    ; Set ray origin
+    xorpd xmm3, xmm3
+    xorpd xmm4, xmm4
+    xorpd xmm5, xmm5
 
-    ; Debug: Color based on ray direction
-    cvtsd2si eax, xmm0
-    add eax, 128
-    mov byte [pixel], al   ; B
-    cvtsd2si eax, xmm1
-    add eax, 128
-    mov byte [pixel+1], al ; G
-    cvtsd2si eax, xmm2
-    add eax, 128
-    mov byte [pixel+2], al ; R
+    ; Trace ray
+    xor rdi, rdi         ; depth = 0
+    call trace_ray
 
-    ; Uncomment the following lines to enable sphere intersection
-    ; Check intersection with sphere 1
-    ; mov rsi, sphere1_center
-    ; movsd xmm3, [sphere1_radius]
-    ; call intersect_sphere
-    
-    ; If hit, color pixel and continue to next
-    ; jnc .check_sphere2
-    ; mov rsi, sphere1_color
-    ; jmp .color_pixel
-
-; .check_sphere2:
-    ; Check intersection with sphere 2
-    ; mov rsi, sphere2_center
-    ; movsd xmm3, [sphere2_radius]
-    ; call intersect_sphere
-    
-    ; If hit, color pixel, otherwise keep debug color
-    ; jnc .write_pixel
-    ; mov rsi, sphere2_color
-
-; .color_pixel:
-    ; mov al, [rsi]
-    ; mov [pixel], al
-    ; mov al, [rsi+1]
-    ; mov [pixel+1], al
-    ; mov al, [rsi+2]
-    ; mov [pixel+2], al
-
-.write_pixel:
-    ; Write pixel to stdout
-    mov rax, 1          ; sys_write
-    mov rdi, 1          ; stdout
-    mov rsi, pixel
-    mov rdx, 3
-    syscall
+    ; Write pixel
+    call write_pixel
 
     ; Loop control
     inc r13
-    cmp r13, 800
+    cmp r13, WIDTH
     jl .col_loop
 
     dec r12
@@ -130,89 +81,152 @@ _start:
     xor rdi, rdi
     syscall
 
-; Helper functions (unchanged)
-normalize_vector:
-    ; Input: xmm0, xmm1, xmm2 (vector components)
-    ; Output: normalized vector in xmm0, xmm1, xmm2
-    movsd xmm3, xmm0
-    mulsd xmm3, xmm3
-    movsd xmm4, xmm1
-    mulsd xmm4, xmm4
-    addsd xmm3, xmm4
-    movsd xmm4, xmm2
-    mulsd xmm4, xmm4
-    addsd xmm3, xmm4
-    sqrtsd xmm3, xmm3
-    divsd xmm0, xmm3
-    divsd xmm1, xmm3
-    divsd xmm2, xmm3
+calculate_ray_direction:
+    ; Input: r13 (x), r12 (y)
+    ; Output: xmm0-xmm2 (direction vector)
+    cvtsi2sd xmm0, r13
+    cvtsi2sd xmm1, r12
+    divsd xmm0, [width]
+    divsd xmm1, [height]
+    subsd xmm0, [half]
+    subsd xmm1, [half]
+    movq xmm2, [neg_mask]
+    xorpd xmm1, xmm2       ; Negate the y-axis
+    mulsd xmm0, [aspect_ratio]
+    movsd xmm2, [neg_one]
+    call normalize_vector
     ret
 
-intersect_sphere:
-    ; Input: xmm0, xmm1, xmm2 (ray direction), rsi (sphere center), xmm3 (sphere radius)
-    ; Output: CF set if intersection, clear if no intersection
-    sub rsp, 24
+trace_ray:
+    ; Input: xmm0-xmm2 (ray direction), xmm3-xmm5 (ray origin), rdi (depth)
+    ; Output: xmm0-xmm2 (color)
+    push rdi
+    
+    ; Check depth
+    cmp rdi, MAX_DEPTH    ; Compare depth to MAX_DEPTH
+    jge .max_depth_reached
+
+    ; Save ray direction and origin
+    sub rsp, 48
     movsd [rsp], xmm0
     movsd [rsp+8], xmm1
     movsd [rsp+16], xmm2
+    movsd [rsp+24], xmm3
+    movsd [rsp+32], xmm4
+    movsd [rsp+40], xmm5
 
-    ; Calculate oc (origin - center)
-    movsd xmm4, [rsi]
-    subsd xmm4, [rsp]
-    movsd xmm5, [rsi+8]
-    subsd xmm5, [rsp+8]
-    movsd xmm6, [rsi+16]
-    subsd xmm6, [rsp+16]
+    ; Check sphere intersections
+    mov rsi, sphere1
+    call intersect_sphere
+    jc .hit_sphere1
+    mov rsi, sphere2
+    call intersect_sphere
+    jc .hit_sphere2
+    mov rsi, sphere3
+    call intersect_sphere
+    jc .hit_sphere3
 
-    ; Calculate b = 2 * dot(oc, ray_direction)
-    mulsd xmm4, xmm0
-    mulsd xmm5, xmm1
-    mulsd xmm6, xmm2
-    addsd xmm4, xmm5
-    addsd xmm4, xmm6
-    addsd xmm4, xmm4    ; b = 2 * dot product
+    ; Check ground intersection
+    call intersect_ground
+    jc .hit_ground
 
-    ; Calculate c = dot(oc, oc) - radius^2
-    movsd xmm5, [rsi]
-    subsd xmm5, [rsp]
-    mulsd xmm5, xmm5
-    movsd xmm6, [rsi+8]
-    subsd xmm6, [rsp+8]
-    mulsd xmm6, xmm6
-    addsd xmm5, xmm6
-    movsd xmm6, [rsi+16]
-    subsd xmm6, [rsp+16]
-    mulsd xmm6, xmm6
-    addsd xmm5, xmm6
-    movsd xmm6, xmm3
-    mulsd xmm6, xmm6
-    subsd xmm5, xmm6    ; c = dot(oc, oc) - radius^2
+    ; No hit, return sky color
+    call calculate_sky_color
+    add rsp, 48
+    jmp .return
 
-    ; Calculate discriminant = b^2 - 4c
+.hit_sphere1:
+    mov rsi, sphere1
+    jmp .shade_sphere
+
+.hit_sphere2:
+    mov rsi, sphere2
+    jmp .shade_sphere
+
+.hit_sphere3:
+    mov rsi, sphere3
+
+.shade_sphere:
+    call shade_sphere
+    add rsp, 48
+    jmp .return
+
+.hit_ground:
+    call shade_ground
+    add rsp, 48
+    jmp .return
+
+.max_depth_reached:
+    movsd xmm0, [black]
+    movsd xmm1, [black+8]
+    movsd xmm2, [black+16]
+
+.return:
+    pop rdi
+    ret
+
+intersect_ground:
+    ; Input: xmm0-xmm2 (ray direction), xmm3-xmm5 (ray origin)
+    ; Output: CF set if intersection, xmm6 (t), xmm7-xmm9 (intersection point)
+    movsd xmm10, [epsilon]
+    comisd xmm1, xmm10
+    jbe .no_intersection
+
     movsd xmm6, xmm4
-    mulsd xmm6, xmm6
-    movsd xmm7, xmm5
-    addsd xmm7, xmm7
-    addsd xmm7, xmm7
-    subsd xmm6, xmm7
+    movq xmm7, [neg_mask]    ; Load the negation mask into xmm7
+    xorpd xmm6, xmm7         ; Flip the sign bit of xmm6
+    divsd xmm6, xmm1         ; Divide xmm6 by the y-component of the ray direction
 
-    ; Check if discriminant is positive
-    xorpd xmm7, xmm7
-    comisd xmm6, xmm7
-    jb .no_intersection
+    movsd xmm7, xmm0         ; Calculate intersection point (x component)
+    mulsd xmm7, xmm6
+    addsd xmm7, xmm3
 
-    ; We have an intersection
-    add rsp, 24
-    stc
+    movsd xmm8, xmm1         ; Calculate intersection point (y component)
+    mulsd xmm8, xmm6
+    addsd xmm8, xmm4
+
+    movsd xmm9, xmm2         ; Calculate intersection point (z component)
+    mulsd xmm9, xmm6
+    addsd xmm9, xmm5
+
+    stc                      ; Set carry flag to indicate intersection
     ret
 
 .no_intersection:
-    add rsp, 24
-    clc
+    clc                      ; Clear carry flag to indicate no intersection
     ret
 
-section .rodata
-    align 8
-    half dq 0.5
-    neg_one dq -1.0
-    aspect_ratio dq 1.3333333333333333  ; 800 / 600
+shade_ground:
+    ; Your shading logic here
+    movsd xmm0, [black]
+    movsd xmm1, [black+8]
+    movsd xmm2, [black+16]
+    ret
+
+calculate_sky_color:
+    ; Sky color calculation
+    movsd xmm3, xmm1
+    addsd xmm3, [one]
+    mulsd xmm3, [half]
+    movsd xmm4, [one]
+    subsd xmm4, xmm3
+    
+    movsd xmm0, [sky_color1]
+    movsd xmm1, [sky_color1+8]
+    movsd xmm2, [sky_color1+16]
+    mulsd xmm0, xmm4
+    mulsd xmm1, xmm4
+    mulsd xmm2, xmm4
+    
+    movsd xmm5, [sky_color2]
+    movsd xmm6, [sky_color2+8]
+    movsd xmm7, [sky_color2+16]
+    mulsd xmm5, xmm3
+    mulsd xmm6, xmm3
+    mulsd xmm7, xmm3
+    
+    addsd xmm0, xmm5
+    addsd xmm1, xmm6
+    addsd xmm2, xmm7
+    ret
+

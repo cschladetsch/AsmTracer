@@ -1,3 +1,6 @@
+/test*
+/out*
+
 # Object files
 *.o
 *.ko
