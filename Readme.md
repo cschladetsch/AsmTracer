@@ -31,7 +31,6 @@ To compile the ray-tracer, follow these steps:
 3. Run the following commands:
     ```bash
     ./r # or ./rd if you want debug info as well
-    ld main.o -o raytracer
     ```
 
 This will create an executable named `raytracer`.
