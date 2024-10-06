@@ -1,4 +1,3 @@
-
 ; sphere.asm - Sphere Intersection and Shading
 
 %include "constants.inc"
@@ -8,8 +7,6 @@ extern add_vector, subtract_vector, multiply_vector
 
 section .text
     global intersect_sphere, shade_sphere
-
-; Definitions of intersect_sphere and shade_sphere go here...
 
 intersect_sphere:
     ; Input: xmm0-xmm2 (ray direction), xmm3-xmm5 (ray origin), rsi (sphere data)
