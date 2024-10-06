@@ -1,3 +1,5 @@
+
+
 ; main.asm - Ray-tracer Main Logic
 
 %include "constants.inc"
