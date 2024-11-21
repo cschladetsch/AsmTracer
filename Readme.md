@@ -1,7 +1,7 @@
 # Assembly Ray-Tracer
 [![License](https://img.shields.io/github/license/cschladetsch/cardchess.svg?label=License&maxAge=86400)](./LICENSE)
 
-This project implements a simple ray-tracer in x86-64 assembly language using NASM (Netwide Assembler). The ray-tracer generates a BMP image file displaying two spheres.
+This project implements a simple ray-tracer in x86-64 assembly language using NASM (Netwide Assembler). The ray-tracer generates a BMP image file displaying three spheres.
 
 ## Sample
 
